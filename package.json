@@ -1,0 +1,17 @@
+{
+  "name": "instagram-dm-panel",
+  "version": "1.0.0",
+  "description": "Automated Instagram DM panel for comment engagement",
+  "scripts": {
+    "install-all": "cd backend && npm install && cd ../frontend && npm install",
+    "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm run dev\"",
+    "start": "cd backend && npm start",
+    "build": "cd frontend && npm run build"
+  },
+  "keywords": ["instagram", "automation", "dm", "marketing"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

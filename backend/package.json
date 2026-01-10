@@ -1,0 +1,30 @@
+{
+  "name": "instagram-dm-panel-backend",
+  "version": "1.0.0",
+  "description": "Backend for Instagram DM automation panel",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "keywords": ["instagram", "automation", "dm", "puppeteer"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "puppeteer": "^21.6.1",
+    "better-sqlite3": "^9.2.2",
+    "bullmq": "^5.1.5",
+    "ioredis": "^5.3.2",
+    "bcrypt": "^5.1.1",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

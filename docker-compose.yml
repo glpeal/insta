@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  instagram-dm-panel:
+    build: .
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DB_PATH=/app/data/instagram_dm.db
+      - HEADLESS=true
+      - MAX_DM_PER_HOUR=30
+      - MIN_DELAY_SECONDS=10
+      - MAX_DELAY_SECONDS=90
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+    volumes:
+      - ./data:/app/data
+      - ./browser-data:/app/backend/.browser-data
+    restart: unless-stopped
+    cap_add:
+      - SYS_ADMIN
+    shm_size: 2gb
+
+  # Optional: Redis for BullMQ (uncomment if needed)
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis-data:/data
+  #   restart: unless-stopped
+
+# volumes:
+#   redis-data:
