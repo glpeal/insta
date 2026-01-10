@@ -5,7 +5,7 @@
 
 export const createTables = (db) => {
   // Instagram accounts table
-  db.exec(`
+  db.db.exec(`
     CREATE TABLE IF NOT EXISTS instagram_accounts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL,
@@ -19,7 +19,7 @@ export const createTables = (db) => {
   `);
 
   // Comments tracking table
-  db.exec(`
+  db.db.exec(`
     CREATE TABLE IF NOT EXISTS tracked_comments (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       account_id INTEGER NOT NULL,
@@ -35,7 +35,7 @@ export const createTables = (db) => {
   `);
 
   // DM logs table
-  db.exec(`
+  db.db.exec(`
     CREATE TABLE IF NOT EXISTS dm_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       account_id INTEGER NOT NULL,
@@ -50,7 +50,7 @@ export const createTables = (db) => {
   `);
 
   // Settings table
-  db.exec(`
+  db.db.exec(`
     CREATE TABLE IF NOT EXISTS settings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       account_id INTEGER NOT NULL,
@@ -65,7 +65,7 @@ export const createTables = (db) => {
   `);
 
   // System logs table
-  db.exec(`
+  db.db.exec(`
     CREATE TABLE IF NOT EXISTS system_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       level TEXT NOT NULL, -- 'info', 'warning', 'error'
@@ -76,7 +76,7 @@ export const createTables = (db) => {
   `);
 
   // Create indexes for better performance
-  db.exec(`
+  db.db.exec(`
     CREATE INDEX IF NOT EXISTS idx_tracked_comments_account
     ON tracked_comments(account_id);
 

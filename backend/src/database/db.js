@@ -1,13 +1,37 @@
-import Database from 'better-sqlite3';
+import sqlite3 from 'sqlite3';
 import { config } from '../config/config.js';
 import { createTables } from './schema.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { promisify } from 'util';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 let dbInstance = null;
+
+// Promisified database operations
+class DatabaseWrapper {
+  constructor(db) {
+    this.db = db;
+    this.run = promisify(db.run.bind(db));
+    this.get = promisify(db.get.bind(db));
+    this.all = promisify(db.all.bind(db));
+    this.exec = promisify(db.exec.bind(db));
+  }
+
+  async prepare(sql) {
+    return {
+      run: (...params) => this.run(sql, params),
+      get: (...params) => this.get(sql, params),
+      all: (...params) => this.all(sql, params)
+    };
+  }
+
+  close() {
+    this.db.close();
+  }
+}
 
 export const initDatabase = () => {
   if (dbInstance) {
@@ -17,9 +41,12 @@ export const initDatabase = () => {
   const dbPath = path.resolve(config.database.path);
   console.log(`📁 Initializing database at: ${dbPath}`);
 
-  dbInstance = new Database(dbPath);
-  dbInstance.pragma('journal_mode = WAL');
-  dbInstance.pragma('foreign_keys = ON');
+  const db = new sqlite3.Database(dbPath);
+  dbInstance = new DatabaseWrapper(db);
+
+  // Enable foreign keys and WAL mode
+  db.run('PRAGMA journal_mode = WAL');
+  db.run('PRAGMA foreign_keys = ON');
 
   createTables(dbInstance);
 
@@ -44,101 +71,101 @@ export const closeDatabase = () => {
 // Helper functions for common queries
 export const dbHelpers = {
   // Instagram accounts
-  getAccount: (username) => {
+  getAccount: async (username) => {
     const db = getDb();
-    return db.prepare('SELECT * FROM instagram_accounts WHERE username = ?').get(username);
+    return db.get('SELECT * FROM instagram_accounts WHERE username = ?', username);
   },
 
-  createAccount: (username) => {
+  createAccount: async (username) => {
     const db = getDb();
-    return db.prepare('INSERT INTO instagram_accounts (username) VALUES (?)').run(username);
+    return db.run('INSERT INTO instagram_accounts (username) VALUES (?)', username);
   },
 
-  updateAccountCookies: (username, encryptedCookies) => {
+  updateAccountCookies: async (username, encryptedCookies) => {
     const db = getDb();
-    return db.prepare(`
+    return db.run(`
       UPDATE instagram_accounts
       SET encrypted_cookies = ?, session_valid = 1, last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
       WHERE username = ?
-    `).run(encryptedCookies, username);
+    `, encryptedCookies, username);
   },
 
   // Comments
-  addTrackedComment: (accountId, commentId, postUrl, commenterUsername, commentText) => {
+  addTrackedComment: async (accountId, commentId, postUrl, commenterUsername, commentText) => {
     const db = getDb();
     try {
-      return db.prepare(`
+      return await db.run(`
         INSERT INTO tracked_comments (account_id, comment_id, post_url, commenter_username, comment_text)
         VALUES (?, ?, ?, ?, ?)
-      `).run(accountId, commentId, postUrl, commenterUsername, commentText);
+      `, accountId, commentId, postUrl, commenterUsername, commentText);
     } catch (error) {
-      if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      if (error.code === 'SQLITE_CONSTRAINT' || error.message.includes('UNIQUE')) {
         return null; // Comment already tracked
       }
       throw error;
     }
   },
 
-  getUnprocessedComments: (accountId) => {
+  getUnprocessedComments: async (accountId) => {
     const db = getDb();
-    return db.prepare(`
+    return db.all(`
       SELECT * FROM tracked_comments
       WHERE account_id = ? AND dm_sent = 0
       ORDER BY detected_at ASC
-    `).all(accountId);
+    `, accountId);
   },
 
-  markCommentProcessed: (commentId) => {
+  markCommentProcessed: async (commentId) => {
     const db = getDb();
-    return db.prepare(`
+    return db.run(`
       UPDATE tracked_comments
       SET dm_sent = 1, dm_sent_at = CURRENT_TIMESTAMP
       WHERE comment_id = ?
-    `).run(commentId);
+    `, commentId);
   },
 
   // DM logs
-  addDmLog: (accountId, recipientUsername, messageTemplate, status, errorMessage = null) => {
+  addDmLog: async (accountId, recipientUsername, messageTemplate, status, errorMessage = null) => {
     const db = getDb();
-    return db.prepare(`
+    return db.run(`
       INSERT INTO dm_logs (account_id, recipient_username, message_template, status, error_message)
       VALUES (?, ?, ?, ?, ?)
-    `).run(accountId, recipientUsername, messageTemplate, status, errorMessage);
+    `, accountId, recipientUsername, messageTemplate, status, errorMessage);
   },
 
-  updateDmLogStatus: (id, status, errorMessage = null) => {
+  updateDmLogStatus: async (id, status, errorMessage = null) => {
     const db = getDb();
-    return db.prepare(`
+    return db.run(`
       UPDATE dm_logs
       SET status = ?, error_message = ?, sent_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(status, errorMessage, id);
+    `, status, errorMessage, id);
   },
 
-  getRecentDmLogs: (accountId, limit = 100) => {
+  getRecentDmLogs: async (accountId, limit = 100) => {
     const db = getDb();
-    return db.prepare(`
+    return db.all(`
       SELECT * FROM dm_logs
       WHERE account_id = ?
       ORDER BY created_at DESC
       LIMIT ?
-    `).all(accountId, limit);
+    `, accountId, limit);
   },
 
   // Settings
-  getSettings: (accountId) => {
+  getSettings: async (accountId) => {
     const db = getDb();
-    return db.prepare('SELECT * FROM settings WHERE account_id = ?').get(accountId);
+    return db.get('SELECT * FROM settings WHERE account_id = ?', accountId);
   },
 
-  createDefaultSettings: (accountId) => {
+  createDefaultSettings: async (accountId) => {
     const db = getDb();
-    return db.prepare(`
+    return db.run(`
       INSERT INTO settings (account_id) VALUES (?)
-    `).run(accountId);
+    `, accountId);
   },
 
-  updateSettings: (accountId, settings) => {
+  updateSettings: async (accountId, settings) => {
     const db = getDb();
     const fields = [];
     const values = [];
@@ -167,23 +194,33 @@ export const dbHelpers = {
     fields.push('updated_at = CURRENT_TIMESTAMP');
     values.push(accountId);
 
-    return db.prepare(`
+    return db.run(`
       UPDATE settings SET ${fields.join(', ')} WHERE account_id = ?
-    `).run(...values);
+    `, ...values);
   },
 
   // System logs
-  addSystemLog: (level, message, details = null) => {
+  addSystemLog: async (level, message, details = null) => {
     const db = getDb();
-    return db.prepare(`
+    return db.run(`
       INSERT INTO system_logs (level, message, details) VALUES (?, ?, ?)
-    `).run(level, message, details);
+    `, level, message, details);
   },
 
-  getRecentSystemLogs: (limit = 100) => {
+  getRecentSystemLogs: async (limit = 100) => {
     const db = getDb();
-    return db.prepare(`
+    return db.all(`
       SELECT * FROM system_logs ORDER BY created_at DESC LIMIT ?
-    `).all(limit);
+    `, limit);
+  },
+
+  getAllTrackedComments: async (accountId, limit = 100) => {
+    const db = getDb();
+    return db.all(`
+      SELECT * FROM tracked_comments
+      WHERE account_id = ?
+      ORDER BY detected_at DESC
+      LIMIT ?
+    `, accountId, limit);
   }
 };
