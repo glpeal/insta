@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Crypto Crash Pro</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0a0f;--card:#12121a;--accent:#6366f1;--green:#10b981;--red:#ef4444;--gold:#f59e0b;--cyan:#06b6d4;--orange:#f97316;--text:#fff;--dim:#6b7280;--border:rgba(255,255,255,0.06)}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'Inter',sans-serif;background:var(--bg);color:var(--text)}
+#game{position:relative;width:100%;height:100%;background:linear-gradient(135deg,#0a0a0f,#0f0f18,#0a0a12);overflow:hidden}
+.orbs{position:absolute;inset:0;pointer-events:none}
+.orb{position:absolute;border-radius:50%;filter:blur(80px);animation:float 20s ease-in-out infinite}
+.orb1{width:400px;height:400px;background:rgba(99,102,241,0.12);top:5%;left:5%}
+.orb2{width:350px;height:350px;background:rgba(16,185,129,0.1);top:50%;right:5%;animation-delay:-7s}
+@keyframes float{0%,100%{transform:translate(0,0)}50%{transform:translate(30px,-30px)}}
+canvas{position:absolute;inset:0;z-index:1}
+#ui{position:absolute;inset:0;z-index:10;pointer-events:none}
+#ui>*{pointer-events:auto}
+#top{position:absolute;top:20px;left:50%;transform:translateX(-50%);display:flex;gap:2px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:4px;backdrop-filter:blur(20px)}
+.stat{display:flex;flex-direction:column;align-items:center;padding:12px 24px;border-radius:12px}
+.stat.active{background:rgba(99,102,241,0.1)}
+.stat-label{font-size:10px;font-weight:600;letter-spacing:1.5px;color:var(--dim);text-transform:uppercase;margin-bottom:4px}
+.stat-val{font-size:20px;font-weight:800}
+.stat-val.bal{color:var(--gold)}
+.stat-val.mult{color:var(--green)}
+.stat-val.bet{color:var(--accent)}
+.stat-val.pop{animation:pop .3s cubic-bezier(.68,-.55,.265,1.55)}
+@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.3)}100%{transform:scale(1)}}
+#coin-box{position:absolute;top:20px;left:20px;display:flex;align-items:center;gap:12px;padding:12px 20px;background:var(--card);border:1px solid var(--border);border-radius:14px}
+#coin-icon{width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;font-size:22px;font-weight:900}
+#coin-name{font-size:14px;font-weight:700}
+#sound{position:absolute;top:20px;right:20px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:var(--card);border:1px solid var(--border);border-radius:14px;color:var(--dim);font-size:18px;cursor:pointer}
+#sound:hover{border-color:var(--accent);color:var(--accent)}
+#ctrl{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:16px;padding:24px;background:var(--card);border:1px solid var(--border);border-radius:24px;min-width:380px}
+.coins{display:flex;gap:8px;justify-content:center}
+.coin-btn{width:48px;height:48px;display:flex;align-items:center;justify-content:center;border:2px solid transparent;border-radius:14px;font-size:18px;font-weight:800;cursor:pointer;transition:all .3s}
+.coin-btn:hover{transform:translateY(-3px) scale(1.05)}
+.coin-btn.active{border-color:var(--coin-color);box-shadow:0 0 30px var(--coin-glow)}
+.bet-row{display:flex;align-items:center;gap:12px}
+.bet-label{font-size:11px;font-weight:600;color:var(--dim);min-width:50px}
+#bet-input{flex:1;padding:14px 18px;background:#1a1a25;border:2px solid var(--border);border-radius:12px;font-family:inherit;font-size:18px;font-weight:700;color:var(--text);text-align:right}
+#bet-input:focus{outline:none;border-color:var(--accent)}
+.bet-btns{display:flex;gap:6px}
+.bet-btn{padding:10px 14px;background:#1a1a25;border:1px solid var(--border);border-radius:10px;font-family:inherit;font-size:12px;font-weight:600;color:var(--dim);cursor:pointer}
+.bet-btn:hover{border-color:var(--accent);color:var(--text)}
+.act-row{display:flex;gap:12px}
+.act-btn{flex:1;padding:16px 24px;border:none;border-radius:14px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:all .3s}
+#play-btn{background:linear-gradient(135deg,var(--accent),#4f46e5);color:#fff;box-shadow:0 4px 20px rgba(99,102,241,0.4)}
+#play-btn:hover:not(:disabled){transform:translateY(-3px)}
+#play-btn:disabled{opacity:.5;cursor:not-allowed}
+#cash-btn{background:linear-gradient(135deg,var(--green),#059669);color:#fff;box-shadow:0 4px 20px rgba(16,185,129,0.4)}
+#cash-btn:hover:not(:disabled){transform:translateY(-3px)}
+#cash-btn:disabled{opacity:.5;cursor:not-allowed}
+#withdraw-btn{padding:12px;background:transparent;border:1px solid var(--border);color:var(--dim)}
+#withdraw-btn:hover{border-color:var(--gold);color:var(--gold)}
+#popup{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.9);display:flex;flex-direction:column;align-items:center;padding:32px 48px;background:var(--card);border:1px solid var(--border);border-radius:28px;backdrop-filter:blur(30px);z-index:200;opacity:0;pointer-events:none;transition:all .4s cubic-bezier(.16,1,.3,1)}
+#popup.show{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}
+#popup.portal{border-color:var(--cyan);box-shadow:0 0 60px rgba(6,182,212,0.4)}
+#popup.rocket{border-color:var(--orange);box-shadow:0 0 60px rgba(249,115,22,0.4)}
+#popup.bonus{border-color:var(--gold);box-shadow:0 0 60px rgba(245,158,11,0.4)}
+#popup.red{border-color:var(--red);box-shadow:0 0 40px rgba(239,68,68,0.4)}
+#popup.green{border-color:var(--green);box-shadow:0 0 40px rgba(16,185,129,0.4)}
+.p-head{display:flex;flex-direction:column;align-items:center;margin-bottom:20px}
+.p-col{font-size:12px;font-weight:600;letter-spacing:2px;color:var(--dim);margin-bottom:8px}
+.p-badge{padding:6px 16px;border-radius:20px;font-size:11px;font-weight:700;display:none}
+.p-badge.show{display:block}
+.p-badge.portal{background:rgba(6,182,212,0.2);color:var(--cyan);border:1px solid var(--cyan)}
+.p-badge.rocket{background:rgba(249,115,22,0.2);color:var(--orange);border:1px solid var(--orange)}
+.p-badge.bonus{background:rgba(245,158,11,0.2);color:var(--gold);border:1px solid var(--gold)}
+.p-badge.red{background:rgba(239,68,68,0.2);color:var(--red);border:1px solid var(--red)}
+.p-badge.green{background:rgba(16,185,129,0.2);color:var(--green);border:1px solid var(--green)}
+.p-coin{width:80px;height:80px;display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:36px;font-weight:900;margin-bottom:16px;animation:coinFloat 2s ease-in-out infinite}
+@keyframes coinFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.p-mult{font-size:48px;font-weight:900;color:var(--green);margin-bottom:8px}
+.p-mult.boosted{color:var(--gold)}
+.p-pot{font-size:14px;color:var(--dim);margin-bottom:16px}
+.p-pot span{color:var(--gold);font-weight:700}
+.p-chance{display:flex;align-items:center;gap:12px;margin-bottom:24px}
+.chance-bar{width:120px;height:8px;background:#1a1a25;border-radius:4px;overflow:hidden}
+.chance-fill{height:100%;border-radius:4px}
+.p-acts{display:flex;gap:16px}
+.p-btn{padding:14px 36px;border:none;border-radius:14px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:all .3s}
+#fly-btn{background:linear-gradient(135deg,var(--red),#dc2626);color:#fff}
+#fly-btn:hover{transform:translateY(-3px) scale(1.05)}
+#take-btn{background:linear-gradient(135deg,var(--green),#059669);color:#fff}
+#take-btn:hover{transform:translateY(-3px) scale(1.05)}
+#result{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.9);display:flex;flex-direction:column;align-items:center;padding:40px 60px;background:var(--card);border:1px solid var(--border);border-radius:28px;z-index:200;opacity:0;pointer-events:none;transition:all .4s}
+#result.show{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}
+#result.win{border-color:var(--green)}
+#result.lose{border-color:var(--red)}
+#result.partial{border-color:var(--gold)}
+.r-icon{width:80px;height:80px;display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:36px;margin-bottom:20px}
+#result.win .r-icon{background:linear-gradient(135deg,var(--green),#059669)}
+#result.lose .r-icon{background:linear-gradient(135deg,var(--red),#dc2626)}
+#result.partial .r-icon{background:linear-gradient(135deg,var(--gold),#d97706)}
+.r-title{font-size:28px;font-weight:900;margin-bottom:8px}
+#result.win .r-title{color:var(--green)}
+#result.lose .r-title{color:var(--red)}
+#result.partial .r-title{color:var(--gold)}
+.r-amount{font-size:36px;font-weight:900}
+#result.win .r-amount{color:var(--green)}
+#result.lose .r-amount{color:var(--red)}
+#result.partial .r-amount{color:var(--gold)}
+.r-saved{font-size:14px;color:var(--gold);display:none}
+.r-saved.show{display:block}
+.r-btn{margin-top:24px;padding:14px 40px;background:#1a1a25;border:1px solid var(--border);border-radius:12px;font-family:inherit;font-size:14px;font-weight:600;color:var(--text);cursor:pointer}
+.r-btn:hover{border-color:var(--accent)}
+#fly-text{position:absolute;top:35%;left:50%;transform:translate(-50%,-50%);font-size:20px;font-weight:700;text-align:center;opacity:0;pointer-events:none;z-index:50}
+#fly-text.show{animation:textPop .5s forwards}
+@keyframes textPop{from{opacity:0;transform:translate(-50%,-50%) scale(.5)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+.alert{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:32px;font-weight:900;opacity:0;pointer-events:none;z-index:250}
+.alert.show{animation:alertPop 2.5s forwards}
+@keyframes alertPop{0%{opacity:0;transform:translate(-50%,-50%) scale(.3)}15%{opacity:1;transform:translate(-50%,-50%) scale(1.2)}30%{transform:translate(-50%,-50%) scale(1)}80%{opacity:1}100%{opacity:0}}
+#bonus-alert{color:var(--gold);text-shadow:0 0 40px rgba(245,158,11,0.6)}
+#rocket-alert{color:var(--orange);text-shadow:0 0 40px rgba(249,115,22,0.6)}
+#portal-alert{color:var(--cyan);text-shadow:0 0 40px rgba(6,182,212,0.6)}
+.screen{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:100;background:rgba(10,10,15,.98);backdrop-filter:blur(30px);transition:all .6s}
+.screen.hidden{opacity:0;visibility:hidden;pointer-events:none}
+.screen-content{display:flex;flex-direction:column;align-items:center;text-align:center;padding:40px;max-width:450px}
+.logo-coins{display:flex;gap:12px;margin-bottom:32px}
+.logo-coin{width:50px;height:50px;display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:22px;font-weight:900;animation:logoCoinFloat 3s ease-in-out infinite}
+.logo-coin:nth-child(1){background:linear-gradient(135deg,#f7931a,#ffb84d);animation-delay:0s}
+.logo-coin:nth-child(2){background:linear-gradient(135deg,#627eea,#8fa8f8);animation-delay:.2s}
+.logo-coin:nth-child(3){background:linear-gradient(135deg,#00d4ff,#67e8f9);animation-delay:.4s}
+.logo-coin:nth-child(4){background:linear-gradient(135deg,#c2a633,#fbbf24);animation-delay:.6s}
+.logo-coin:nth-child(5){background:linear-gradient(135deg,#00aae4,#38bdf8);animation-delay:.8s}
+@keyframes logoCoinFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-15px)}}
+.main-title h1{font-size:42px;font-weight:900;background:linear-gradient(135deg,#fff,#6366f1,#10b981,#f59e0b);background-size:300% 300%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:gradShift 5s ease infinite}
+@keyframes gradShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+.main-title span{display:block;font-size:16px;font-weight:500;color:var(--dim);letter-spacing:8px;margin-top:4px}
+.tagline{font-size:14px;color:var(--dim);line-height:1.8;margin:16px 0 32px}
+.features{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:36px}
+.feature{padding:8px 16px;background:var(--card);border:1px solid var(--border);border-radius:20px;font-size:12px;color:var(--dim)}
+.start-btn{padding:18px 60px;background:linear-gradient(135deg,var(--accent),#4f46e5);border:none;border-radius:16px;font-family:inherit;font-size:16px;font-weight:700;letter-spacing:2px;color:#fff;cursor:pointer;box-shadow:0 8px 40px rgba(99,102,241,0.4)}
+.start-btn:hover{transform:translateY(-4px)}
+#plinko-overlay{position:fixed;inset:0;background:linear-gradient(135deg,rgba(10,10,15,.98),rgba(15,15,24,.98));backdrop-filter:blur(30px);z-index:500;display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+#plinko-overlay.show{display:flex}
+.plinko-title{font-size:42px;font-weight:900;background:linear-gradient(135deg,var(--cyan),#67e8f9,var(--gold));background-size:200% 200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:gradShift 3s ease infinite;margin-bottom:12px;text-shadow:0 0 40px rgba(6,182,212,0.3)}
+.plinko-balls{font-size:18px;color:var(--dim);margin-bottom:24px;display:flex;align-items:center;gap:12px;padding:12px 24px;background:var(--card);border:1px solid var(--border);border-radius:16px}
+.plinko-balls span{color:var(--gold);font-weight:800;font-size:28px;text-shadow:0 0 20px rgba(245,158,11,0.5)}
+.plinko-board{background:linear-gradient(180deg,#1a1a28,#0f0f18);border-radius:28px;border:2px solid rgba(99,102,241,0.3);overflow:hidden;box-shadow:0 8px 60px rgba(0,0,0,0.6),inset 0 0 40px rgba(99,102,241,0.1)}
+#plinko-canvas{display:block}
+.plinko-result{font-size:32px;font-weight:900;color:var(--green);margin:24px 0;opacity:0;transition:opacity .5s;text-shadow:0 0 30px rgba(16,185,129,0.5)}
+.plinko-result.show{opacity:1}
+.plinko-result span{color:var(--gold)}
+.plinko-close{padding:16px 48px;background:linear-gradient(135deg,var(--cyan),#0891b2);border:none;border-radius:14px;font-family:inherit;font-size:16px;font-weight:700;color:#fff;cursor:pointer;opacity:0;transition:opacity .3s;box-shadow:0 4px 30px rgba(6,182,212,0.4)}
+.plinko-close.show{opacity:1}
+.plinko-close:hover{transform:translateY(-2px);box-shadow:0 6px 40px rgba(6,182,212,0.6)}
+#ball-spinner{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:linear-gradient(135deg,var(--card),#1a1a28);border:2px solid var(--cyan);border-radius:28px;padding:48px 64px;z-index:600;display:none;flex-direction:column;align-items:center;box-shadow:0 0 80px rgba(6,182,212,0.5)}
+#ball-spinner.show{display:flex}
+.spinner-title{font-size:14px;font-weight:600;color:var(--cyan);letter-spacing:2px;margin-bottom:16px;text-transform:uppercase}
+.spinner-value{font-size:80px;font-weight:900;background:linear-gradient(135deg,var(--gold),#fbbf24);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:0 0 60px rgba(245,158,11,0.4)}
+.spinner-sub{font-size:12px;color:var(--dim);margin-top:12px}
+#second-chance{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--card);border:2px solid var(--gold);border-radius:28px;padding:40px 56px;z-index:300;display:none;flex-direction:column;align-items:center;text-align:center;box-shadow:0 0 80px rgba(245,158,11,0.4)}
+#second-chance.show{display:flex}
+.sc-icon{width:80px;height:80px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--gold),#d97706);border-radius:50%;font-size:36px;margin-bottom:20px;animation:starPulse 1.5s ease-in-out infinite}
+@keyframes starPulse{0%,100%{transform:scale(1);box-shadow:0 0 20px rgba(245,158,11,0.4)}50%{transform:scale(1.1);box-shadow:0 0 40px rgba(245,158,11,0.8)}}
+.sc-title{font-size:28px;font-weight:900;color:var(--gold);margin-bottom:8px}
+.sc-text{font-size:14px;color:var(--dim);line-height:1.6;margin-bottom:24px}
+.sc-btn{padding:14px 40px;background:linear-gradient(135deg,var(--gold),#d97706);border:none;border-radius:12px;font-family:inherit;font-size:14px;font-weight:700;color:#000;cursor:pointer;transition:all .3s}
+.sc-btn:hover{transform:translateY(-2px);box-shadow:0 4px 30px rgba(245,158,11,0.6)}
+</style>
+</head>
+<body>
+<div id="game">
+<div class="orbs"><div class="orb orb1"></div><div class="orb orb2"></div></div>
+<canvas id="canvas"></canvas>
+<div id="ui">
+<div id="top">
+<div class="stat"><span class="stat-label">Баланс</span><span class="stat-val bal" id="bal">1,000</span></div>
+<div class="stat active"><span class="stat-label">Ставка</span><span class="stat-val bet" id="betv">0</span></div>
+<div class="stat"><span class="stat-label">Множитель</span><span class="stat-val mult" id="multv">1.0×</span></div>
+</div>
+<div id="coin-box"><div id="coin-icon" style="background:linear-gradient(135deg,#f7931a,#ffb84d)">B</div><span id="coin-name" style="color:#f7931a">Bitcoin</span></div>
+<button id="sound">♪</button>
+<div id="ctrl">
+<div class="coins">
+<button class="coin-btn active" data-c="btc" style="background:linear-gradient(135deg,#f7931a,#ffb84d);--coin-color:#f7931a;--coin-glow:rgba(247,147,26,0.4)">B</button>
+<button class="coin-btn" data-c="eth" style="background:linear-gradient(135deg,#627eea,#8fa8f8);--coin-color:#627eea;--coin-glow:rgba(98,126,234,0.4)">E</button>
+<button class="coin-btn" data-c="sol" style="background:linear-gradient(135deg,#00d4ff,#67e8f9);--coin-color:#00d4ff;--coin-glow:rgba(0,212,255,0.4)">S</button>
+<button class="coin-btn" data-c="doge" style="background:linear-gradient(135deg,#c2a633,#fbbf24);--coin-color:#c2a633;--coin-glow:rgba(194,166,51,0.4)">D</button>
+<button class="coin-btn" data-c="xrp" style="background:linear-gradient(135deg,#00aae4,#38bdf8);--coin-color:#00aae4;--coin-glow:rgba(0,170,228,0.4)">X</button>
+</div>
+<div class="bet-row"><span class="bet-label">Ставка</span><input type="number" id="bet-input" value="100" min="1"><div class="bet-btns"><button class="bet-btn" data-a="half">½</button><button class="bet-btn" data-a="double">2×</button><button class="bet-btn" data-a="max">MAX</button></div></div>
+<div class="act-row"><button class="act-btn" id="play-btn">Играть</button><button class="act-btn" id="cash-btn" disabled>Забрать</button></div>
+<button class="act-btn" id="withdraw-btn">Вывести всё</button>
+</div>
+<div id="fly-text"></div>
+<div class="alert" id="bonus-alert">Бонус ×2!</div>
+<div class="alert" id="rocket-alert">Ракета +2!</div>
+<div class="alert" id="portal-alert">Портал!</div>
+<div id="popup">
+<div class="p-head"><span class="p-col">Колонна <span id="col-num">1</span></span><div class="p-badge" id="badge"></div></div>
+<div class="p-coin" id="p-coin" style="background:linear-gradient(135deg,#f7931a,#ffb84d)">B</div>
+<div class="p-mult" id="p-mult">1.5×</div>
+<div class="p-pot">Выигрыш: <span id="p-win">150</span></div>
+<div class="p-chance"><span style="color:var(--dim)">Шанс</span><div class="chance-bar"><div class="chance-fill" id="chance-fill"></div></div><span id="chance-val">85%</span></div>
+<div class="p-acts"><button class="p-btn" id="fly-btn">Лететь</button><button class="p-btn" id="take-btn">Забрать</button></div>
+</div>
+<div id="result"><div class="r-icon" id="r-icon">✓</div><div class="r-title" id="r-title">Выигрыш!</div><div class="r-amount" id="r-amount">+500</div><div class="r-saved" id="r-saved">Защита: +30</div><button class="r-btn" id="r-btn">Продолжить</button></div>
+</div>
+<div class="screen" id="start-screen">
+<div class="screen-content">
+<div class="logo-coins"><div class="logo-coin">B</div><div class="logo-coin">E</div><div class="logo-coin">S</div><div class="logo-coin">D</div><div class="logo-coin">X</div></div>
+<div class="main-title"><h1>CRYPTO CRASH</h1><span>PRO</span></div>
+<p class="tagline">Выбирай криптовалюту, делай ставку<br>и лети через колонны за множителями!</p>
+<div class="features"><span class="feature">Бонусные колонны</span><span class="feature">Ракета +2</span><span class="feature">Портал Plinko</span><span class="feature">Защита ставки</span><span class="feature">Второй шанс</span></div>
+<button class="start-btn" id="start-btn">Начать игру</button>
+</div>
+</div>
+</div>
+<div id="plinko-overlay"><h2 class="plinko-title">PLINKO PORTAL</h2><div class="plinko-balls">Шарики: <span id="balls-num">0</span></div><div class="plinko-board"><canvas id="plinko-canvas" width="500" height="600"></canvas></div><div class="plinko-result" id="plinko-result">Выигрыш: <span id="plinko-win">0</span></div><button class="plinko-close" id="plinko-close">Забрать выигрыш</button></div>
+<div id="ball-spinner"><div class="spinner-title">Количество шариков</div><div class="spinner-value" id="spinner-val">1</div><div class="spinner-sub">Определяем...</div></div>
+<div id="second-chance"><div class="sc-icon">★</div><div class="sc-title">Второй шанс!</div><div class="sc-text">Удача на твоей стороне!<br>Ты получаешь ещё одну попытку!</div><button class="sc-btn" id="sc-btn">Продолжить</button></div>
+<script>
+(function(){
+'use strict';
+const COINS={btc:{name:'Bitcoin',sym:'B',color:'#f7931a',grad:'linear-gradient(135deg,#f7931a,#ffb84d)',glow:'rgba(247,147,26,0.5)'},eth:{name:'Ethereum',sym:'E',color:'#627eea',grad:'linear-gradient(135deg,#627eea,#8fa8f8)',glow:'rgba(98,126,234,0.5)'},sol:{name:'Solana',sym:'S',color:'#00d4ff',grad:'linear-gradient(135deg,#00d4ff,#67e8f9)',glow:'rgba(0,212,255,0.5)'},doge:{name:'Dogecoin',sym:'D',color:'#c2a633',grad:'linear-gradient(135deg,#c2a633,#fbbf24)',glow:'rgba(194,166,51,0.5)'},xrp:{name:'Ripple',sym:'X',color:'#00aae4',grad:'linear-gradient(135deg,#00aae4,#38bdf8)',glow:'rgba(0,170,228,0.5)'}};
+const MULTS=[1,1.2,1.5,1.8,2.2,2.7,3.3,4,5,6.2,7.8,10,13,17,22,28,36,46,60,78,100];
+const MAX_COLS=21;
+const CFG={SPEED:5,COL_SPACE:400,COL_W:80,P_RAD:26,P_X:.22,BONUS_CH:.03,PORTAL_CH:1,ROCKET_CH:.03,SC_RATE:.1};
+let canvas,ctx,W,H,state='idle',balance=1000,bet=0,mult=1,colIdx=0;
+let player,columns,camX=0,targetCam=0,snd=true,audioCtx,lastT=0;
+let deciding=false,flying=false,selCoin='btc';
+let chances=[],losses=0,bonusUsed=false,bonusMult=1;
+let plinkoWin=0;
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.min(Math.max(v,a),b);
+const rand=(a,b)=>Math.random()*(b-a)+a;
+const randInt=(a,b)=>Math.floor(rand(a,b+1));
+const lerp=(a,b,t)=>a+(b-a)*t;
+function genChances(){chances=[];let base=randInt(85,95);for(let i=0;i<MAX_COLS;i++){base=clamp(base+randInt(-10,5),5,95);base-=randInt(2,7);base=Math.max(base,2);chances.push(base)}}
+function initAudio(){try{audioCtx=new(window.AudioContext||window.webkitAudioContext)()}catch(e){snd=false}}
+function playS(t){if(!snd||!audioCtx)return;try{if(audioCtx.state==='suspended')audioCtx.resume();const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.connect(g);g.connect(audioCtx.destination);const n=audioCtx.currentTime;if(t==='click'){o.frequency.setValueAtTime(800,n);g.gain.setValueAtTime(.08,n);g.gain.exponentialRampToValueAtTime(.01,n+.05);o.start(n);o.stop(n+.05)}else if(t==='pass'){o.type='triangle';o.frequency.setValueAtTime(600,n);o.frequency.setValueAtTime(900,n+.1);g.gain.setValueAtTime(.12,n);g.gain.exponentialRampToValueAtTime(.01,n+.15);o.start(n);o.stop(n+.15)}else if(t==='win'){o.frequency.setValueAtTime(523,n);o.frequency.setValueAtTime(784,n+.2);g.gain.setValueAtTime(.15,n);g.gain.exponentialRampToValueAtTime(.01,n+.4);o.start(n);o.stop(n+.4)}else if(t==='crash'){o.type='sawtooth';o.frequency.setValueAtTime(200,n);o.frequency.exponentialRampToValueAtTime(30,n+.5);g.gain.setValueAtTime(.2,n);g.gain.exponentialRampToValueAtTime(.01,n+.5);o.start(n);o.stop(n+.5)}else if(t==='bonus'){o.frequency.setValueAtTime(880,n);o.frequency.setValueAtTime(1760,n+.3);g.gain.setValueAtTime(.2,n);g.gain.exponentialRampToValueAtTime(.01,n+.5);o.start(n);o.stop(n+.5)}else if(t==='plinko'){o.frequency.setValueAtTime(500+Math.random()*500,n);g.gain.setValueAtTime(.08,n);g.gain.exponentialRampToValueAtTime(.01,n+.08);o.start(n);o.stop(n+.08)}}catch(e){}}
+function createPlayer(){return{worldX:0,y:H/2,r:CFG.P_RAD,rot:0,pulse:0,trail:[]}}
+function updatePlayer(dt){if(state==='flying'&&flying&&!deciding){const col=columns[colIdx];const stopX=col.worldX-120;if(player.worldX<stopX){player.worldX+=CFG.SPEED*dt;targetCam=player.worldX-W*CFG.P_X;player.y=H/2+Math.sin(player.worldX*.01)*30;player.rot=Math.sin(player.worldX*.015)*.15;if(Math.random()<.6)player.trail.push({x:player.worldX-player.r,y:player.y,a:1,s:rand(3,8)})}else{player.worldX=stopX;flying=false;deciding=true;showPopup()}}camX=lerp(camX,targetCam,.06);player.pulse+=.06*dt;for(let i=player.trail.length-1;i>=0;i--){player.trail[i].a-=.03*dt;if(player.trail[i].a<=0)player.trail.splice(i,1)}}
+function renderPlayer(){const coin=COINS[selCoin];const sx=player.worldX-camX;for(const t of player.trail){const tx=t.x-camX;ctx.globalAlpha=t.a*.5;ctx.fillStyle=coin.color;ctx.beginPath();ctx.arc(tx,t.y,t.s,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1;ctx.save();ctx.translate(sx,player.y);ctx.rotate(player.rot);const glow=ctx.createRadialGradient(0,0,player.r*.5,0,0,player.r*2.5);glow.addColorStop(0,coin.glow);glow.addColorStop(1,'transparent');ctx.fillStyle=glow;ctx.beginPath();ctx.arc(0,0,player.r*2.5,0,Math.PI*2);ctx.fill();ctx.fillStyle=coin.color;ctx.beginPath();ctx.arc(0,0,player.r,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.font=`bold ${player.r*1.2}px Inter`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(coin.sym,0,1);ctx.restore()}
+function createColumns(){columns=[];genChances();bonusUsed=false;bonusMult=1;let bonusIdx=-1,portalIdx=-1,rocketIdx=-1;if(Math.random()<CFG.BONUS_CH)bonusIdx=randInt(0,3);if(Math.random()<CFG.PORTAL_CH){portalIdx=randInt(0,2);if(portalIdx===bonusIdx)portalIdx++}if(Math.random()<CFG.ROCKET_CH){rocketIdx=randInt(0,4);if(rocketIdx===bonusIdx||rocketIdx===portalIdx)rocketIdx=-1}for(let i=0;i<MAX_COLS;i++){const zone=Math.random()<.15?'red':Math.random()<.2?'green':'normal';let ch=chances[i];if(zone==='red')ch=Math.max(ch-15,5);else if(zone==='green')ch=Math.min(ch+12,95);chances[i]=ch;columns.push({worldX:380+i*CFG.COL_SPACE,idx:i,passed:false,revealed:false,gapOpen:.32,zone,isBonus:i===bonusIdx,isPortal:i===portalIdx,isRocket:i===rocketIdx,anim:0})}}
+function updateColumns(dt){for(const c of columns){if(c.revealed&&c.gapOpen<.45)c.gapOpen=Math.min(c.gapOpen+.012*dt,.45);c.anim+=.08*dt}}
+function renderColumns(){for(const c of columns){const sx=c.worldX-camX;if(sx<-200||sx>W+200)continue;const x=sx-CFG.COL_W/2;const gapT=H*(.5-c.gapOpen);const gapB=H*(.5+c.gapOpen);let col,glow;if(c.isPortal&&!c.revealed){col='#06b6d4';glow='rgba(6,182,212,0.4)'}else if(c.isRocket&&!c.revealed){col='#f97316';glow='rgba(249,115,22,0.4)'}else if(c.isBonus&&!c.revealed){col='#f59e0b';glow='rgba(245,158,11,0.4)'}else if(!c.revealed){if(c.zone==='red'){col='#991b1b';glow='rgba(239,68,68,0.2)'}else if(c.zone==='green'){col='#166534';glow='rgba(16,185,129,0.2)'}else{col='#374151';glow='rgba(75,85,99,0.2)'}}else if(c.passed){col='#10b981';glow='rgba(16,185,129,0.4)'}else{col='#ef4444';glow='rgba(239,68,68,0.4)'}ctx.shadowBlur=15;ctx.shadowColor=glow;ctx.fillStyle=col;ctx.beginPath();ctx.roundRect(x,0,CFG.COL_W,gapT,[0,0,12,12]);ctx.fill();ctx.beginPath();ctx.roundRect(x,gapB,CFG.COL_W,H-gapB,[12,12,0,0]);ctx.fill();ctx.shadowBlur=0;let m=MULTS[c.idx]||100;if(bonusMult>1)m*=bonusMult;ctx.fillStyle='#9ca3af';ctx.font='bold 16px Inter';ctx.textAlign='center';ctx.fillText(m.toFixed(1)+'×',sx,H/2+4);ctx.fillStyle='rgba(255,255,255,0.3)';ctx.font='10px Inter';ctx.fillText('#'+(c.idx+1),sx,H/2-24);if(!c.revealed){const ch=chances[c.idx];ctx.fillStyle='rgba(255,255,255,0.1)';ctx.beginPath();ctx.roundRect(sx-25,H/2+18,50,4,2);ctx.fill();ctx.fillStyle=ch>50?'#10b981':ch>25?'#f59e0b':'#ef4444';ctx.beginPath();ctx.roundRect(sx-25,H/2+18,50*(ch/100),4,2);ctx.fill();ctx.font='bold 24px Inter';if(c.isPortal){ctx.fillStyle='#67e8f9';ctx.fillText('◉',sx,H/2+50)}else if(c.isRocket){ctx.fillStyle='#fdba74';ctx.fillText('▲',sx,H/2+50)}else if(c.isBonus){ctx.fillStyle='#fbbf24';ctx.fillText('★',sx,H/2+50)}else{ctx.fillStyle='rgba(255,255,255,0.15)';ctx.font='bold 36px Inter';ctx.fillText('?',sx,H/2+52)}}else{ctx.font='bold 32px Inter';ctx.fillStyle=c.passed?'#34d399':'#f87171';ctx.fillText(c.passed?'✓':'✕',sx,H/2+50)}}}
+function renderBg(){ctx.strokeStyle='rgba(255,255,255,0.03)';ctx.lineWidth=1;const gs=60;const ox=-camX%gs;for(let x=ox;x<W;x+=gs){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}for(let y=0;y<H;y+=gs){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}}
+function updateUI(){$('bal').textContent=balance.toLocaleString();$('betv').textContent=bet.toLocaleString();$('multv').textContent=mult.toFixed(1)+'×';const c=COINS[selCoin];$('coin-icon').textContent=c.sym;$('coin-icon').style.background=c.grad;$('coin-name').textContent=c.name;$('coin-name').style.color=c.color;$('p-coin').textContent=c.sym;$('p-coin').style.background=c.grad}
+function pop(id){const el=$(id);el.classList.remove('pop');void el.offsetWidth;el.classList.add('pop')}
+function selCoinF(cid){selCoin=cid;document.querySelectorAll('.coin-btn').forEach(b=>b.classList.toggle('active',b.dataset.c===cid));updateUI();playS('click')}
+function showPopup(){const col=columns[colIdx];let m=MULTS[colIdx]||100;if(bonusMult>1)m*=bonusMult;const ch=chances[colIdx];$('col-num').textContent=colIdx+1;$('p-mult').textContent=m.toFixed(1)+'×';$('p-mult').classList.toggle('boosted',bonusMult>1);$('p-win').textContent=Math.floor(bet*m).toLocaleString();$('chance-val').textContent=ch+'%';$('chance-fill').style.width=ch+'%';$('chance-fill').style.background=ch>50?'linear-gradient(90deg,#10b981,#34d399)':ch>25?'linear-gradient(90deg,#f59e0b,#fbbf24)':'linear-gradient(90deg,#ef4444,#f87171)';$('chance-val').style.color=ch>50?'#34d399':ch>25?'#fbbf24':'#f87171';const p=$('popup');const b=$('badge');p.classList.remove('portal','rocket','bonus','red','green');b.classList.remove('show','portal','rocket','bonus','red','green');if(col.isPortal){b.classList.add('show','portal');b.textContent='ПОРТАЛ';p.classList.add('portal')}else if(col.isRocket){b.classList.add('show','rocket');b.textContent='РАКЕТА +2';p.classList.add('rocket')}else if(col.isBonus){b.classList.add('show','bonus');b.textContent='БОНУС ×2';p.classList.add('bonus')}else if(col.zone==='red'){b.classList.add('show','red');b.textContent='РИСК';p.classList.add('red')}else if(col.zone==='green'){b.classList.add('show','green');b.textContent='СТАБИЛЬНОСТЬ';p.classList.add('green')}p.classList.add('show');$('fly-text').classList.remove('show')}
+function hidePopup(){$('popup').classList.remove('show')}
+function showResult(won,amt,saved=0){const p=$('result');p.classList.remove('show','win','lose','partial');if(saved>0){p.classList.add('partial');$('r-icon').textContent='🛡';$('r-title').textContent='Защита!'}else if(won){p.classList.add('win');$('r-icon').textContent='✓';$('r-title').textContent='Выигрыш!'}else{p.classList.add('lose');$('r-icon').textContent='✕';$('r-title').textContent='Крах!'}$('r-amount').textContent=(won||saved>0?'+':'')+Math.floor(amt);const s=$('r-saved');if(saved>0){s.classList.add('show');s.textContent='Защита: +'+Math.floor(saved)}else{s.classList.remove('show')}setTimeout(()=>p.classList.add('show'),50);if(won)playS('win');else if(saved>0)playS('bonus');else playS('crash')}
+function hideResult(){$('result').classList.remove('show')}
+function showFlyText(num,extra=''){const el=$('fly-text');el.innerHTML='Летим к колонне #'+num+extra;el.style.color=COINS[selCoin].color;el.classList.remove('show');void el.offsetWidth;el.classList.add('show')}
+function showAlert(type){const el=$(type+'-alert');el.classList.remove('show');void el.offsetWidth;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2500)}
+function checkSC(){return losses>=3&&Math.random()<CFG.SC_RATE}
+function showSC(){return new Promise(r=>{$('second-chance').classList.add('show');$('sc-btn').onclick=()=>{$('second-chance').classList.remove('show');r()}})}
+async function startPlinko(){$('plinko-overlay').classList.add('show');$('plinko-result').classList.remove('show');$('plinko-close').classList.remove('show');const balls=await spinBalls();$('balls-num').textContent=balls;plinkoWin=0;await runPlinko(balls);const finalWin=plinkoWin*bonusMult;plinkoWin=finalWin;$('plinko-win').textContent=finalWin.toFixed(0);$('plinko-result').classList.add('show');$('plinko-close').classList.add('show');await new Promise(r=>{$('plinko-close').onclick=()=>{$('plinko-overlay').classList.remove('show');r()}});return finalWin}
+async function spinBalls(){$('ball-spinner').classList.add('show');const w=[25,20,15,10,8,6,5,4,3,2,1,1,1,1,1,1,1,1,1,1];const tw=w.reduce((a,b)=>a+b,0);let res=1;const rr=Math.random()*tw;let cum=0;for(let i=0;i<w.length;i++){cum+=w[i];if(rr<cum){res=i+1;break}}const sv=$('spinner-val');for(let i=0;i<25;i++){sv.textContent=randInt(1,20);await new Promise(r=>setTimeout(r,60+i*8))}sv.textContent=res;await new Promise(r=>setTimeout(r,800));$('ball-spinner').classList.remove('show');return res}
+async function runPlinko(ballCount){const cv=$('plinko-canvas');const pc=cv.getContext('2d');const pW=cv.width,pH=cv.height;const MULTS=[100,50,20,10,5,2,1.5,1,0.5,1,1.5,2,5,10,20,50,100];
+const ROWS=14;
+const COLS=15;
+const pegR=5;
+const ballR=8;
+const marginX=40;
+const marginTop=60;
+const marginBottom=100;
+const availH=pH-marginTop-marginBottom;
+const availW=pW-marginX*2;
+const pegSpX=availW/(COLS-1);
+const pegSpY=availH/(ROWS-1);
+const pegs=[];
+for(let row=0;row<ROWS;row++){
+const offset=row%2===0?0:pegSpX/2;
+for(let col=0;col<COLS;col++){
+const x=marginX+col*pegSpX+offset;
+if(x>=marginX&&x<=pW-marginX){
+pegs.push({x:x,y:marginTop+row*pegSpY,pulse:Math.random()*Math.PI*2})
+}
+}
+}
+function draw(balls=[]){
+pc.fillStyle='#0a0a0f';
+pc.fillRect(0,0,pW,pH);
+const gradient=pc.createLinearGradient(0,0,0,pH);
+gradient.addColorStop(0,'rgba(99,102,241,0.05)');
+gradient.addColorStop(1,'rgba(6,182,212,0.05)');
+pc.fillStyle=gradient;
+pc.fillRect(0,0,pW,pH);
+for(const peg of pegs){
+const pulse=Math.sin(peg.pulse)*.5+.5;
+const glowSize=pegR+pulse*2;
+const grad=pc.createRadialGradient(peg.x,peg.y,0,peg.x,peg.y,glowSize*2);
+grad.addColorStop(0,'rgba(99,102,241,0.6)');
+grad.addColorStop(.5,'rgba(99,102,241,0.2)');
+grad.addColorStop(1,'transparent');
+pc.fillStyle=grad;
+pc.beginPath();
+pc.arc(peg.x,peg.y,glowSize*2,0,Math.PI*2);
+pc.fill();
+pc.fillStyle='#6366f1';
+pc.beginPath();
+pc.arc(peg.x,peg.y,pegR,0,Math.PI*2);
+pc.fill();
+peg.pulse+=0.02;
+}
+const bucketY=pH-marginBottom+10;
+const bucketW=availW/MULTS.length;
+const bucketH=60;
+for(let i=0;i<MULTS.length;i++){
+const x=marginX+i*bucketW;
+const m=MULTS[i];
+const isHigh=m>=10;
+const isMid=m>=2&&m<10;
+pc.fillStyle=isHigh?'rgba(245,158,11,0.3)':isMid?'rgba(16,185,129,0.25)':'rgba(99,102,241,0.15)';
+pc.strokeStyle=isHigh?'rgba(245,158,11,0.6)':isMid?'rgba(16,185,129,0.4)':'rgba(99,102,241,0.3)';
+pc.lineWidth=2;
+pc.beginPath();
+pc.roundRect(x+2,bucketY,bucketW-4,bucketH,8);
+pc.fill();
+pc.stroke();
+pc.fillStyle=isHigh?'#fbbf24':isMid?'#34d399':'#a0a0a0';
+pc.font='bold 14px Inter';
+pc.textAlign='center';
+pc.fillText(m+'×',x+bucketW/2,bucketY+bucketH/2+5);
+}
+for(const b of balls){
+const grad=pc.createRadialGradient(b.x,b.y,0,b.x,b.y,ballR*2);
+grad.addColorStop(0,'rgba(251,191,36,0.8)');
+grad.addColorStop(.6,'rgba(251,191,36,0.3)');
+grad.addColorStop(1,'transparent');
+pc.fillStyle=grad;
+pc.beginPath();
+pc.arc(b.x,b.y,ballR*2,0,Math.PI*2);
+pc.fill();
+pc.fillStyle='#fbbf24';
+pc.beginPath();
+pc.arc(b.x,b.y,ballR,0,Math.PI*2);
+pc.fill();
+pc.fillStyle='#fff';
+pc.globalAlpha=.3;
+pc.beginPath();
+pc.arc(b.x-ballR*.3,b.y-ballR*.3,ballR*.4,0,Math.PI*2);
+pc.fill();
+pc.globalAlpha=1;
+}
+}
+async function dropBall(){
+return new Promise(res=>{
+let x=pW/2+rand(-pegSpX*.3,pegSpX*.3);
+let y=20;
+let vx=0;
+let vy=0;
+const g=.4;
+const balls=[{x,y}];
+function anim(){
+vy+=g;
+x+=vx;
+y+=vy;
+vx*=.98;
+vy*=.995;
+for(const peg of pegs){
+const dx=x-peg.x;
+const dy=y-peg.y;
+const d=Math.sqrt(dx*dx+dy*dy);
+if(d<pegR+ballR){
+const ang=Math.atan2(dy,dx);
+x=peg.x+Math.cos(ang)*(pegR+ballR+.5);
+y=peg.y+Math.sin(ang)*(pegR+ballR+.5);
+vx=Math.cos(ang)*3+rand(-1,1);
+vy=Math.abs(Math.sin(ang)*2);
+playS('plinko');
+}
+}
+if(x<ballR+marginX){
+x=ballR+marginX;
+vx=-vx*.6;
+}
+if(x>pW-ballR-marginX){
+x=pW-ballR-marginX;
+vx=-vx*.6;
+}
+balls[0]={x,y};
+draw(balls);
+const bucketY=pH-marginBottom+10;
+if(y>=bucketY){
+const bucketW=availW/MULTS.length;
+const relX=x-marginX;
+const bucket=Math.floor(relX/bucketW);
+const m=MULTS[clamp(bucket,0,MULTS.length-1)];
+plinkoWin+=bet*m;
+res(m);
+}else{
+requestAnimationFrame(anim);
+}
+}
+anim();
+});
+}
+draw();
+for(let i=0;i<ballCount;i++){
+await dropBall();
+await new Promise(r=>setTimeout(r,300));
+}
+}
+function tryFly(){hidePopup();const col=columns[colIdx];col.revealed=true;playS('click');setTimeout(async()=>{const ch=chances[colIdx];const roll=Math.random()*100;const success=roll<ch;col.passed=success;if(success){playS('pass');if(col.isRocket){playS('bonus');showAlert('rocket');for(let i=0;i<2&&colIdx+1<columns.length;i++){columns[colIdx+1].passed=true;columns[colIdx+1].revealed=true;colIdx++}}if(col.isBonus&&!bonusUsed){bonusUsed=true;bonusMult=2;playS('bonus');showAlert('bonus')}if(col.isPortal){playS('bonus');showAlert('portal');await new Promise(r=>setTimeout(r,1000));const pr=await startPlinko();balance+=pr;pop('bal')}let m=MULTS[colIdx]||100;if(bonusMult>1)m*=bonusMult;mult=m;pop('multv');updateUI();colIdx++;if(colIdx<columns.length){deciding=false;flying=true;const nc=columns[colIdx];let ex='';if(nc.isPortal)ex=' — Портал!';else if(nc.isRocket)ex=' — Ракета!';else if(nc.isBonus)ex=' — Бонус!';showFlyText(colIdx+1,ex)}else cashout()}else{if(checkSC()){playS('bonus');await showSC();losses=0;col.passed=true;let m=MULTS[colIdx]||100;if(bonusMult>1)m*=bonusMult;mult=m;pop('multv');updateUI();colIdx++;if(colIdx<columns.length){deciding=false;flying=true;showFlyText(colIdx+1,'')}else cashout();return}losses++;let saved=0;const pr=Math.random();if(pr<.33)saved=bet*.1;else if(pr<.66)saved=bet*.2;else saved=bet*.3;balance+=saved;setTimeout(()=>{state='result';showResult(false,-bet+saved,saved);bet=0;mult=1;updateUI()},400)}},500)}
+function cashout(){hidePopup();$('fly-text').classList.remove('show');const win=Math.floor(bet*mult);balance+=win;showResult(true,win-bet);pop('bal');state='result';bet=0;mult=1;updateUI()}
+function startGame(){const b=parseInt($('bet-input').value)||0;if(b<=0||b>balance){alert('Неверная ставка!');return}bet=b;balance-=b;mult=1;colIdx=0;createColumns();player=createPlayer();camX=0;targetCam=0;state='flying';deciding=false;flying=true;$('play-btn').disabled=true;$('cash-btn').disabled=false;updateUI();pop('betv');playS('click');const fc=columns[0];let ex='';if(fc.isPortal)ex=' — Портал!';else if(fc.isRocket)ex=' — Ракета!';else if(fc.isBonus)ex=' — Бонус!';showFlyText(1,ex)}
+function reset(){hideResult();$('fly-text').classList.remove('show');state='idle';bet=0;mult=1;colIdx=0;camX=0;targetCam=0;$('play-btn').disabled=false;$('cash-btn').disabled=true;player=createPlayer();createColumns();updateUI()}
+function withdraw(){if(balance<=0){alert('Баланс пуст!');return}alert('Вы вывели '+Math.floor(balance)+' монет!');balance=1000;losses=0;updateUI();$('start-screen').classList.remove('hidden')}
+function update(dt){updatePlayer(dt);updateColumns(dt)}
+function render(){ctx.clearRect(0,0,W,H);renderBg();renderColumns();renderPlayer()}
+function loop(t){const dt=lastT?Math.min((t-lastT)/16.67,3):1;lastT=t;update(dt);render();requestAnimationFrame(loop)}
+function resize(){const c=$('game');const dpr=Math.min(window.devicePixelRatio||1,2);W=c.clientWidth;H=c.clientHeight;canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+'px';canvas.style.height=H+'px';ctx.setTransform(dpr,0,0,dpr,0,0);if(player)player.y=H/2}
+function init(){canvas=$('canvas');ctx=canvas.getContext('2d');resize();window.addEventListener('resize',resize);initAudio();player=createPlayer();createColumns();updateUI();$('start-btn').onclick=()=>{playS('click');$('start-screen').classList.add('hidden')};$('play-btn').onclick=startGame;$('cash-btn').onclick=()=>{if(state==='flying'&&deciding)cashout()};$('withdraw-btn').onclick=withdraw;$('fly-btn').onclick=()=>{playS('click');tryFly()};$('take-btn').onclick=()=>{playS('click');cashout()};$('r-btn').onclick=()=>{playS('click');reset()};$('sound').onclick=()=>{snd=!snd;$('sound').textContent=snd?'♪':'✕';playS('click')};document.querySelectorAll('.coin-btn').forEach(b=>b.onclick=()=>selCoinF(b.dataset.c));document.querySelectorAll('.bet-btn').forEach(b=>b.onclick=()=>{const a=b.dataset.a;const inp=$('bet-input');let v=parseInt(inp.value)||0;if(a==='half')v=Math.floor(v/2);else if(a==='double')v=Math.min(v*2,balance);else if(a==='max')v=Math.floor(balance);inp.value=Math.max(1,v);playS('click')});requestAnimationFrame(loop)}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
+</script>
+</body>
+</html>
