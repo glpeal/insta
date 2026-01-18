@@ -883,8 +883,7 @@ async def main():
     print(f"  API_ID = {API_ID}")
     print(f"  API_HASH = {API_HASH}")
     print(f"  PHONE = {PHONE}")
-    print(f"  AI_API = {AI_API_URL}")
-    print(f"  MODEL = {AI_MODEL}")
+    print(f"  AI = g4f (бесплатный)")
 
     # Тестируем API
     if not await test_ai_api():
