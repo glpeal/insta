@@ -777,7 +777,7 @@ class GirlBot:
 
 async def manual_auth(client):
     """Ручная авторизация с явной отправкой кода"""
-    from telethon.errors import SessionPasswordNeededError
+    from telethon.errors import SessionPasswordNeededError, PhoneCodeInvalidError, FloodWaitError
 
     print("\n[*] Подключение к Telegram...")
     await client.connect()
@@ -786,35 +786,95 @@ async def manual_auth(client):
         print("[+] Уже авторизован!")
         return True
 
-    print(f"[*] Отправка кода на номер {PHONE}...")
+    phone_code_hash = None
 
-    try:
-        # Явно отправляем запрос на код
-        sent_code = await client.send_code_request(PHONE)
-        print("[+] Код отправлен!")
-        print(f"[*] Тип доставки: {sent_code.type}")
-        print("[!] Проверь Telegram - там должно прийти сообщение с 5 цифрами")
+    while True:
+        print()
+        print("Выбери способ получения кода:")
+        print("  1 - Отправить код в Telegram (по умолчанию)")
+        print("  2 - Отправить код по SMS")
+        print("  3 - Позвонить (код скажут голосом)")
+        print("  0 - Выход")
         print()
 
-        code = input("Введи код из Telegram (5 цифр): ").strip()
+        choice = input("Твой выбор [1]: ").strip() or "1"
 
-        try:
-            await client.sign_in(PHONE, code)
-            print("[+] Успешная авторизация!")
-            return True
-        except SessionPasswordNeededError:
-            print("[!] Требуется пароль двухфакторной аутентификации")
-            password = input("Введи пароль 2FA: ").strip()
-            await client.sign_in(password=password)
-            print("[+] Успешная авторизация с 2FA!")
-            return True
-        except Exception as e:
-            print(f"[-] Ошибка при вводе кода: {e}")
+        if choice == "0":
             return False
 
-    except Exception as e:
-        print(f"[-] Ошибка отправки кода: {e}")
-        return False
+        try:
+            print(f"\n[*] Отправка кода на номер {PHONE}...")
+
+            if choice == "2":
+                # Сначала обычный запрос, потом resend для SMS
+                if phone_code_hash is None:
+                    result = await client.send_code_request(PHONE)
+                    phone_code_hash = result.phone_code_hash
+                # Повторная отправка через SMS
+                from telethon.tl.functions.auth import ResendCodeRequest
+                result = await client(ResendCodeRequest(PHONE, phone_code_hash))
+                phone_code_hash = result.phone_code_hash
+                print("[+] SMS отправлено!")
+
+            elif choice == "3":
+                # Звонок
+                if phone_code_hash is None:
+                    result = await client.send_code_request(PHONE)
+                    phone_code_hash = result.phone_code_hash
+                from telethon.tl.functions.auth import ResendCodeRequest
+                result = await client(ResendCodeRequest(PHONE, phone_code_hash))
+                phone_code_hash = result.phone_code_hash
+                print("[+] Сейчас позвонят!")
+
+            else:
+                # Обычная отправка в Telegram
+                result = await client.send_code_request(PHONE)
+                phone_code_hash = result.phone_code_hash
+                print("[+] Код отправлен в Telegram!")
+
+            print(f"[*] Тип: {result.type}")
+            print()
+            print("[!] Код - это 5 ЦИФР")
+            print("[!] Проверь:")
+            print("    - Приложение Telegram (сообщение от 'Telegram')")
+            print("    - SMS на телефон")
+            print()
+
+            code = input("Введи 5 цифр кода (или 'r' чтобы отправить заново): ").strip()
+
+            if code.lower() == 'r':
+                continue
+
+            if not code.isdigit() or len(code) != 5:
+                print("[-] Код должен быть 5 цифр!")
+                continue
+
+            try:
+                await client.sign_in(PHONE, code, phone_code_hash=phone_code_hash)
+                print("[+] Успешная авторизация!")
+                return True
+
+            except PhoneCodeInvalidError:
+                print("[-] Неверный код! Попробуй ещё раз")
+                continue
+
+            except SessionPasswordNeededError:
+                print("[!] Требуется пароль 2FA")
+                password = input("Введи пароль: ").strip()
+                await client.sign_in(password=password)
+                print("[+] Успешная авторизация с 2FA!")
+                return True
+
+        except FloodWaitError as e:
+            print(f"[-] Слишком много попыток! Подожди {e.seconds} секунд")
+            return False
+
+        except Exception as e:
+            print(f"[-] Ошибка: {e}")
+            print("[*] Попробуй другой способ")
+            continue
+
+    return False
 
 
 async def main():
@@ -825,13 +885,31 @@ async def main():
     print(f"  API_ID = {API_ID}")
     print(f"  API_HASH = {API_HASH}")
     print(f"  PHONE = {PHONE}")
-    print()
 
-    client = TelegramClient('girl_session', API_ID, API_HASH)
+    # Удаляем старую сессию если есть проблемы
+    session_file = "girl_session.session"
+    if os.path.exists(session_file):
+        print(f"\n[?] Найдена старая сессия. Удалить? (y/n)")
+        if input().strip().lower() == 'y':
+            os.remove(session_file)
+            print("[+] Сессия удалена")
+
+    # Создаем клиент с параметрами устройства
+    client = TelegramClient(
+        'girl_session',
+        API_ID,
+        API_HASH,
+        device_model="Samsung Galaxy S21",
+        system_version="Android 12",
+        app_version="9.4.0",
+        lang_code="ru",
+        system_lang_code="ru-RU"
+    )
 
     # Ручная авторизация
     if not await manual_auth(client):
         print("[-] Не удалось авторизоваться")
+        await client.disconnect()
         return
 
     print("\n[+] Бот запущен и слушает сообщения...")
