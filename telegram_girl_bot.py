@@ -525,11 +525,19 @@ class GirlBot:
         try:
             # Игнорируем групповые чаты и каналы
             if event.is_group or event.is_channel:
+                print(f"[DEBUG] Пропуск группового сообщения")
                 return
 
             sender = await event.get_sender()
             if not sender or sender.bot:
+                print(f"[DEBUG] Пропуск: sender={sender}, bot={sender.bot if sender else 'N/A'}")
                 return
+
+            # ЛОГИРОВАНИЕ
+            print(f"\n{'='*50}")
+            print(f"[НОВОЕ СООБЩЕНИЕ]")
+            print(f"  От: {sender.first_name} (ID: {sender.id})")
+            print(f"  Текст: {event.message.message[:100] if event.message.message else '[медиа/пусто]'}")
 
             user_id = sender.id
             user_data = bot_state.get_user(user_id)
@@ -657,10 +665,13 @@ class GirlBot:
             messages = [{"role": "user", "content": user_content}]
 
             # Получаем ответ от ИИ
+            print(f"[DEBUG] Отправка запроса к API...")
             ai_response = await call_ai_api(messages, user_data)
+            print(f"[DEBUG] Ответ API: {ai_response[:200] if ai_response else 'ПУСТО/ОШИБКА'}")
 
             if not ai_response:
                 # Если API не ответило, отправляем что-то нейтральное
+                print(f"[WARN] API не ответило, используем fallback")
                 fallback_responses = ["хм", "ага", "понятно", "ну ок", ")"]
                 ai_response = random.choice(fallback_responses)
 
@@ -697,16 +708,18 @@ class GirlBot:
                 await asyncio.sleep(typing_time)
 
                 await event.respond(part)
+                print(f"[ОТПРАВЛЕНО] {part}")
 
                 # Пауза между сообщениями
                 if i < len(response_parts) - 1:
                     await asyncio.sleep(random.uniform(0.5, 2))
 
+            print(f"{'='*50}\n")
             # Сохраняем данные
             bot_state.save_data()
 
         except Exception as e:
-            print(f"Ошибка обработки сообщения: {e}")
+            print(f"[ERROR] Ошибка обработки сообщения: {e}")
             import traceback
             traceback.print_exc()
 
@@ -877,6 +890,37 @@ async def manual_auth(client):
     return False
 
 
+async def test_ai_api():
+    """Тест подключения к AI API"""
+    print("\n[*] Тестирование AI API...")
+    try:
+        connector = aiohttp.TCPConnector(ssl=ssl_context)
+        async with aiohttp.ClientSession(connector=connector) as session:
+            payload = {
+                "model": AI_MODEL,
+                "messages": [
+                    {"role": "user", "content": "Привет, скажи 'работает' одним словом"}
+                ]
+            }
+            async with session.post(AI_API_URL, json=payload, timeout=30) as resp:
+                print(f"[DEBUG] API статус: {resp.status}")
+                if resp.status == 200:
+                    result = await resp.json()
+                    print(f"[DEBUG] API ответ: {result}")
+                    answer = result.get('answer', result.get('response', result.get('content', '')))
+                    if answer:
+                        print(f"[+] AI API работает! Ответ: {answer[:100]}")
+                        return True
+                    else:
+                        print(f"[-] API вернул пустой ответ: {result}")
+                else:
+                    text = await resp.text()
+                    print(f"[-] API вернул ошибку {resp.status}: {text[:200]}")
+    except Exception as e:
+        print(f"[-] Ошибка подключения к API: {e}")
+    return False
+
+
 async def main():
     print("=" * 50)
     print("Telegram Girl Bot - Запуск")
@@ -885,6 +929,14 @@ async def main():
     print(f"  API_ID = {API_ID}")
     print(f"  API_HASH = {API_HASH}")
     print(f"  PHONE = {PHONE}")
+    print(f"  AI_API = {AI_API_URL}")
+    print(f"  MODEL = {AI_MODEL}")
+
+    # Тестируем API
+    if not await test_ai_api():
+        print("\n[!] ВНИМАНИЕ: AI API не работает!")
+        print("[!] Бот будет отвечать fallback-фразами")
+        input("Нажми Enter чтобы продолжить или Ctrl+C для выхода...")
 
     # Удаляем старую сессию если есть проблемы
     session_file = "girl_session.session"
