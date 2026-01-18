@@ -775,23 +775,88 @@ class GirlBot:
 
 # ==================== ЗАПУСК ====================
 
+async def manual_auth(client):
+    """Ручная авторизация с явной отправкой кода"""
+    from telethon.errors import SessionPasswordNeededError
+
+    print("\n[*] Подключение к Telegram...")
+    await client.connect()
+
+    if await client.is_user_authorized():
+        print("[+] Уже авторизован!")
+        return True
+
+    print(f"[*] Отправка кода на номер {PHONE}...")
+
+    try:
+        # Явно отправляем запрос на код
+        sent_code = await client.send_code_request(PHONE)
+        print("[+] Код отправлен!")
+        print(f"[*] Тип доставки: {sent_code.type}")
+        print("[!] Проверь Telegram - там должно прийти сообщение с 5 цифрами")
+        print()
+
+        code = input("Введи код из Telegram (5 цифр): ").strip()
+
+        try:
+            await client.sign_in(PHONE, code)
+            print("[+] Успешная авторизация!")
+            return True
+        except SessionPasswordNeededError:
+            print("[!] Требуется пароль двухфакторной аутентификации")
+            password = input("Введи пароль 2FA: ").strip()
+            await client.sign_in(password=password)
+            print("[+] Успешная авторизация с 2FA!")
+            return True
+        except Exception as e:
+            print(f"[-] Ошибка при вводе кода: {e}")
+            return False
+
+    except Exception as e:
+        print(f"[-] Ошибка отправки кода: {e}")
+        return False
+
+
 async def main():
-    bot = GirlBot()
-    await bot.start()
-
-
-if __name__ == "__main__":
     print("=" * 50)
     print("Telegram Girl Bot - Запуск")
     print("=" * 50)
     print()
-    print("ВАЖНО: Перед запуском заполни настройки:")
     print(f"  API_ID = {API_ID}")
     print(f"  API_HASH = {API_HASH}")
     print(f"  PHONE = {PHONE}")
     print()
-    print("Получить API_ID и API_HASH можно на https://my.telegram.org")
-    print()
-    print("=" * 50)
 
-    asyncio.run(main())
+    client = TelegramClient('girl_session', API_ID, API_HASH)
+
+    # Ручная авторизация
+    if not await manual_auth(client):
+        print("[-] Не удалось авторизоваться")
+        return
+
+    print("\n[+] Бот запущен и слушает сообщения...")
+    print("[*] Для остановки нажми Ctrl+C")
+    print()
+
+    # Создаем бота с уже авторизованным клиентом
+    bot = GirlBot()
+    bot.client = client
+
+    # Регистрируем обработчик
+    @client.on(events.NewMessage(incoming=True))
+    async def handler(event):
+        await bot.handle_message(event)
+
+    # Запускаем фоновые задачи
+    asyncio.create_task(bot.proactive_messages_loop())
+    asyncio.create_task(bot.periodic_save_loop())
+
+    await client.run_until_disconnected()
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n[*] Бот остановлен")
+        bot_state.save_data()
