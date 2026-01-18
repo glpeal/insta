@@ -19,10 +19,11 @@ from datetime import datetime, timedelta
 try:
     import g4f
     from g4f.client import Client as G4FClient
+    from g4f.Provider import DDG, Blackbox, PollinationsAI
     G4F_AVAILABLE = True
 except ImportError:
     G4F_AVAILABLE = False
-    print("[!] g4f не установлен. Установи: pip install g4f")
+    print("[!] g4f не установлен. Установи: pip install -U g4f")
 
 # Telethon для работы с Telegram аккаунтом
 from telethon import TelegramClient, events
@@ -255,25 +256,23 @@ async def call_ai_api(messages, user_data):
 
         # Используем g4f в отдельном потоке чтобы не блокировать
         def sync_call():
-            try:
-                client = G4FClient()
-                response = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=history,
-                )
-                return response.choices[0].message.content
-            except Exception as e:
-                print(f"[ERROR] g4f primary error: {e}")
-                # Fallback на прямой вызов
+            providers = [DDG, Blackbox, PollinationsAI]
+
+            for provider in providers:
                 try:
+                    print(f"[DEBUG] Пробую провайдер: {provider.__name__}")
                     response = g4f.ChatCompletion.create(
-                        model=g4f.models.gpt_4o_mini,
+                        model="gpt-4o-mini",
                         messages=history,
+                        provider=provider,
                     )
-                    return response
-                except Exception as e2:
-                    print(f"[ERROR] g4f fallback error: {e2}")
-                    return None
+                    if response:
+                        return response
+                except Exception as e:
+                    print(f"[DEBUG] {provider.__name__} error: {e}")
+                    continue
+
+            return None
 
         # Запускаем в executor чтобы не блокировать event loop
         loop = asyncio.get_event_loop()
@@ -842,34 +841,41 @@ async def manual_auth(client):
 
 async def test_ai_api():
     """Тест подключения к g4f AI"""
-    print(f"\n[*] Тестирование g4f AI...")
+    print(f"\n[*] Тестирование g4f AI (бесплатные провайдеры)...")
 
     if not G4F_AVAILABLE:
         print("[-] g4f не установлен!")
-        print("[*] Установи командой: pip install g4f")
+        print("[*] Установи командой: pip install -U g4f")
         return False
 
     try:
         def sync_test():
-            try:
-                client = G4FClient()
-                response = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[{"role": "user", "content": "Скажи 'работает' одним словом"}],
-                )
-                return response.choices[0].message.content
-            except Exception as e:
-                print(f"[DEBUG] g4f client error: {e}")
-                return None
+            providers = [DDG, Blackbox, PollinationsAI]
+
+            for provider in providers:
+                try:
+                    print(f"[*] Тестирую {provider.__name__}...")
+                    response = g4f.ChatCompletion.create(
+                        model="gpt-4o-mini",
+                        messages=[{"role": "user", "content": "Скажи 'работает' одним словом"}],
+                        provider=provider,
+                    )
+                    if response:
+                        return f"{provider.__name__}: {response}"
+                except Exception as e:
+                    print(f"[-] {provider.__name__}: {e}")
+                    continue
+
+            return None
 
         loop = asyncio.get_event_loop()
         answer = await loop.run_in_executor(None, sync_test)
 
         if answer:
-            print(f"[+] AI работает! Ответ: {answer[:100]}")
+            print(f"[+] AI работает! {answer[:100]}")
             return True
         else:
-            print(f"[-] AI не ответил")
+            print(f"[-] Ни один провайдер не работает")
     except Exception as e:
         print(f"[-] Ошибка подключения к API: {e}")
     return False
