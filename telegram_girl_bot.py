@@ -12,12 +12,17 @@ import re
 import ssl
 import time
 import os
-import base64
 import tempfile
 from datetime import datetime, timedelta
-from collections import defaultdict
-import aiohttp
-import aiofiles
+
+# g4f для бесплатного AI
+try:
+    import g4f
+    from g4f.client import Client as G4FClient
+    G4F_AVAILABLE = True
+except ImportError:
+    G4F_AVAILABLE = False
+    print("[!] g4f не установлен. Установи: pip install g4f")
 
 # Telethon для работы с Telegram аккаунтом
 from telethon import TelegramClient, events
@@ -27,7 +32,7 @@ from telethon.tl.types import (
     MessageMediaPhoto,
     MessageMediaDocument
 )
-from telethon.tl.functions.messages import SetTypingRequest
+from telethon.tl.functions.messages import SetTypingRequest, ReadHistoryRequest
 from telethon.tl.types import SendMessageTypingAction
 
 # ==================== НАСТРОЙКИ ====================
@@ -36,10 +41,6 @@ from telethon.tl.types import SendMessageTypingAction
 API_ID = 12345678  # Замени на свой API_ID
 API_HASH = "your_api_hash_here"  # Замени на свой API_HASH
 PHONE = "+79001234567"  # Замени на свой номер телефона
-
-# API ИИ - Бесплатный API
-AI_API_URL = "http://api.onlysq.ru/ai/v2"
-AI_MODEL = "gpt-4o-mini"
 
 # Файл для хранения данных
 DATA_FILE = "bot_data.json"
@@ -236,40 +237,49 @@ async def get_media_duration(message):
 
 
 async def call_ai_api(messages, user_data):
-    """Вызов AI API"""
+    """Вызов AI через g4f (бесплатно)"""
+    if not G4F_AVAILABLE:
+        return None
+
     try:
         # Формируем историю
         history = [{"role": "system", "content": SYSTEM_PROMPT}]
 
         # Добавляем историю переписки
-        for msg in user_data.conversation_history[-15:]:
+        for msg in user_data.conversation_history[-10:]:
             history.append(msg)
 
         # Добавляем текущее сообщение
         for msg in messages:
             history.append(msg)
 
-        connector = aiohttp.TCPConnector(ssl=ssl_context)
-        async with aiohttp.ClientSession(connector=connector) as session:
-            payload = {
-                "model": AI_MODEL,
-                "messages": history
-            }
-
-            async with session.post(AI_API_URL, json=payload, timeout=120) as resp:
-                if resp.status == 200:
-                    result = await resp.json()
-                    # Пробуем разные форматы ответа
-                    answer = result.get('answer') or result.get('response') or result.get('content')
-                    if not answer and 'choices' in result:
-                        answer = result['choices'][0]['message']['content']
-                    if isinstance(answer, list):
-                        answer = ' '.join([str(a) for a in answer])
-                    return answer
-                else:
-                    error_text = await resp.text()
-                    print(f"[ERROR] API Error {resp.status}: {error_text[:300]}")
+        # Используем g4f в отдельном потоке чтобы не блокировать
+        def sync_call():
+            try:
+                client = G4FClient()
+                response = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=history,
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                print(f"[ERROR] g4f primary error: {e}")
+                # Fallback на прямой вызов
+                try:
+                    response = g4f.ChatCompletion.create(
+                        model=g4f.models.gpt_4o_mini,
+                        messages=history,
+                    )
+                    return response
+                except Exception as e2:
+                    print(f"[ERROR] g4f fallback error: {e2}")
                     return None
+
+        # Запускаем в executor чтобы не блокировать event loop
+        loop = asyncio.get_event_loop()
+        answer = await loop.run_in_executor(None, sync_call)
+
+        return answer
     except Exception as e:
         print(f"[ERROR] Ошибка вызова API: {e}")
         return None
@@ -468,6 +478,16 @@ class GirlBot:
             print(f"[НОВОЕ СООБЩЕНИЕ]")
             print(f"  От: {sender.first_name} (ID: {sender.id})")
             print(f"  Текст: {event.message.message[:100] if event.message.message else '[медиа/пусто]'}")
+
+            # Помечаем сообщение как прочитанное (заходим в чат)
+            try:
+                await self.client(ReadHistoryRequest(
+                    peer=event.chat_id,
+                    max_id=event.message.id
+                ))
+                print(f"  [+] Сообщение прочитано")
+            except Exception as e:
+                print(f"  [-] Ошибка прочтения: {e}")
 
             user_id = sender.id
             user_data = bot_state.get_user(user_id)
@@ -821,33 +841,35 @@ async def manual_auth(client):
 
 
 async def test_ai_api():
-    """Тест подключения к AI API"""
-    print(f"\n[*] Тестирование AI API ({AI_API_URL})...")
+    """Тест подключения к g4f AI"""
+    print(f"\n[*] Тестирование g4f AI...")
+
+    if not G4F_AVAILABLE:
+        print("[-] g4f не установлен!")
+        print("[*] Установи командой: pip install g4f")
+        return False
+
     try:
-        connector = aiohttp.TCPConnector(ssl=ssl_context)
-        async with aiohttp.ClientSession(connector=connector) as session:
-            payload = {
-                "model": AI_MODEL,
-                "messages": [
-                    {"role": "user", "content": "Привет, скажи 'работает' одним словом"}
-                ]
-            }
-            async with session.post(AI_API_URL, json=payload, timeout=30) as resp:
-                print(f"[DEBUG] API статус: {resp.status}")
-                if resp.status == 200:
-                    result = await resp.json()
-                    print(f"[DEBUG] API ответ: {result}")
-                    answer = result.get('answer') or result.get('response') or result.get('content')
-                    if not answer and 'choices' in result:
-                        answer = result['choices'][0]['message']['content']
-                    if answer:
-                        print(f"[+] AI API работает! Ответ: {answer[:100]}")
-                        return True
-                    else:
-                        print(f"[-] API вернул пустой ответ: {result}")
-                else:
-                    text = await resp.text()
-                    print(f"[-] API вернул ошибку {resp.status}: {text[:300]}")
+        def sync_test():
+            try:
+                client = G4FClient()
+                response = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": "Скажи 'работает' одним словом"}],
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                print(f"[DEBUG] g4f client error: {e}")
+                return None
+
+        loop = asyncio.get_event_loop()
+        answer = await loop.run_in_executor(None, sync_test)
+
+        if answer:
+            print(f"[+] AI работает! Ответ: {answer[:100]}")
+            return True
+        else:
+            print(f"[-] AI не ответил")
     except Exception as e:
         print(f"[-] Ошибка подключения к API: {e}")
     return False
