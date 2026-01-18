@@ -37,9 +37,9 @@ API_ID = 12345678  # Замени на свой API_ID
 API_HASH = "your_api_hash_here"  # Замени на свой API_HASH
 PHONE = "+79001234567"  # Замени на свой номер телефона
 
-# API ИИ - Google Gemini
-GEMINI_API_KEY = "AIzaSyC9PGRPM21RwgySeaggiMbOep_5wAitst8"
-AI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+# API ИИ - Бесплатный API
+AI_API_URL = "http://api.onlysq.ru/ai/v2"
+AI_MODEL = "gpt-4o-mini"
 
 # Файл для хранения данных
 DATA_FILE = "bot_data.json"
@@ -209,80 +209,16 @@ async def download_media(client, message, temp_dir):
 
 
 async def transcribe_voice(file_path):
-    """Транскрибация голосового сообщения через Google Gemini API"""
-    try:
-        with open(file_path, 'rb') as f:
-            audio_data = base64.b64encode(f.read()).decode('utf-8')
-
-        # Определяем MIME тип аудио
-        ext = os.path.splitext(file_path)[1].lower()
-        mime_types = {'.ogg': 'audio/ogg', '.mp3': 'audio/mp3', '.wav': 'audio/wav', '.m4a': 'audio/mp4'}
-        mime_type = mime_types.get(ext, 'audio/ogg')
-
-        connector = aiohttp.TCPConnector(ssl=ssl_context)
-        async with aiohttp.ClientSession(connector=connector) as session:
-            payload = {
-                "contents": [
-                    {
-                        "parts": [
-                            {"text": "Расшифруй это голосовое сообщение. Напиши только текст того, что говорит человек, без комментариев."},
-                            {"inlineData": {"mimeType": mime_type, "data": audio_data}}
-                        ]
-                    }
-                ]
-            }
-
-            async with session.post(AI_API_URL, json=payload, timeout=60) as resp:
-                if resp.status == 200:
-                    result = await resp.json()
-                    try:
-                        return result["candidates"][0]["content"]["parts"][0]["text"]
-                    except (KeyError, IndexError):
-                        print(f"[ERROR] Ошибка парсинга ответа транскрибации: {result}")
-                else:
-                    print(f"[ERROR] Transcribe API error: {resp.status}")
-    except Exception as e:
-        print(f"[ERROR] Ошибка транскрибации: {e}")
+    """Заглушка для транскрибации (API не поддерживает аудио)"""
+    # Этот API не поддерживает аудио, возвращаем None
+    # Бот просто ответит на голосовое как на обычное сообщение
     return None
 
 
 async def analyze_image(file_path, user_message=""):
-    """Анализ изображения через Google Gemini API"""
-    try:
-        with open(file_path, 'rb') as f:
-            image_data = base64.b64encode(f.read()).decode('utf-8')
-
-        # Определяем тип файла
-        ext = os.path.splitext(file_path)[1].lower()
-        mime_types = {'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif', '.webp': 'image/webp'}
-        mime_type = mime_types.get(ext, 'image/jpeg')
-
-        prompt = f"Опиши что на этом изображении кратко (1-2 предложения). Сообщение от человека: {user_message}" if user_message else "Опиши что на этом изображении кратко (1-2 предложения)."
-
-        connector = aiohttp.TCPConnector(ssl=ssl_context)
-        async with aiohttp.ClientSession(connector=connector) as session:
-            payload = {
-                "contents": [
-                    {
-                        "parts": [
-                            {"text": prompt},
-                            {"inlineData": {"mimeType": mime_type, "data": image_data}}
-                        ]
-                    }
-                ]
-            }
-
-            async with session.post(AI_API_URL, json=payload, timeout=60) as resp:
-                if resp.status == 200:
-                    result = await resp.json()
-                    try:
-                        return result["candidates"][0]["content"]["parts"][0]["text"]
-                    except (KeyError, IndexError):
-                        print(f"[ERROR] Ошибка парсинга ответа изображения: {result}")
-                else:
-                    print(f"[ERROR] Image API error: {resp.status}")
-    except Exception as e:
-        print(f"[ERROR] Ошибка анализа изображения: {e}")
+    """Заглушка для анализа изображений (API не поддерживает картинки)"""
+    # Этот API не поддерживает изображения
+    # Бот просто ответит на фото как на обычное сообщение
     return None
 
 
@@ -300,50 +236,36 @@ async def get_media_duration(message):
 
 
 async def call_ai_api(messages, user_data):
-    """Вызов Google Gemini API"""
+    """Вызов AI API"""
     try:
-        # Формируем историю в формате Gemini
-        contents = []
+        # Формируем историю
+        history = [{"role": "system", "content": SYSTEM_PROMPT}]
 
         # Добавляем историю переписки
         for msg in user_data.conversation_history[-15:]:
-            role = "user" if msg["role"] == "user" else "model"
-            contents.append({
-                "role": role,
-                "parts": [{"text": msg["content"]}]
-            })
+            history.append(msg)
 
         # Добавляем текущее сообщение
         for msg in messages:
-            role = "user" if msg["role"] == "user" else "model"
-            contents.append({
-                "role": role,
-                "parts": [{"text": msg["content"]}]
-            })
+            history.append(msg)
 
         connector = aiohttp.TCPConnector(ssl=ssl_context)
         async with aiohttp.ClientSession(connector=connector) as session:
             payload = {
-                "contents": contents,
-                "systemInstruction": {
-                    "parts": [{"text": SYSTEM_PROMPT}]
-                },
-                "generationConfig": {
-                    "temperature": 0.9,
-                    "maxOutputTokens": 1000
-                }
+                "model": AI_MODEL,
+                "messages": history
             }
 
             async with session.post(AI_API_URL, json=payload, timeout=120) as resp:
                 if resp.status == 200:
                     result = await resp.json()
-                    # Извлекаем текст из ответа Gemini
-                    try:
-                        answer = result["candidates"][0]["content"]["parts"][0]["text"]
-                        return answer
-                    except (KeyError, IndexError) as e:
-                        print(f"[ERROR] Не удалось извлечь ответ: {result}")
-                        return None
+                    # Пробуем разные форматы ответа
+                    answer = result.get('answer') or result.get('response') or result.get('content')
+                    if not answer and 'choices' in result:
+                        answer = result['choices'][0]['message']['content']
+                    if isinstance(answer, list):
+                        answer = ' '.join([str(a) for a in answer])
+                    return answer
                 else:
                     error_text = await resp.text()
                     print(f"[ERROR] API Error {resp.status}: {error_text[:300]}")
@@ -899,14 +821,15 @@ async def manual_auth(client):
 
 
 async def test_ai_api():
-    """Тест подключения к Google Gemini API"""
-    print("\n[*] Тестирование Google Gemini API...")
+    """Тест подключения к AI API"""
+    print(f"\n[*] Тестирование AI API ({AI_API_URL})...")
     try:
         connector = aiohttp.TCPConnector(ssl=ssl_context)
         async with aiohttp.ClientSession(connector=connector) as session:
             payload = {
-                "contents": [
-                    {"role": "user", "parts": [{"text": "Привет, скажи 'работает' одним словом"}]}
+                "model": AI_MODEL,
+                "messages": [
+                    {"role": "user", "content": "Привет, скажи 'работает' одним словом"}
                 ]
             }
             async with session.post(AI_API_URL, json=payload, timeout=30) as resp:
@@ -914,12 +837,14 @@ async def test_ai_api():
                 if resp.status == 200:
                     result = await resp.json()
                     print(f"[DEBUG] API ответ: {result}")
-                    try:
-                        answer = result["candidates"][0]["content"]["parts"][0]["text"]
+                    answer = result.get('answer') or result.get('response') or result.get('content')
+                    if not answer and 'choices' in result:
+                        answer = result['choices'][0]['message']['content']
+                    if answer:
                         print(f"[+] AI API работает! Ответ: {answer[:100]}")
                         return True
-                    except (KeyError, IndexError):
-                        print(f"[-] API вернул неожиданный формат: {result}")
+                    else:
+                        print(f"[-] API вернул пустой ответ: {result}")
                 else:
                     text = await resp.text()
                     print(f"[-] API вернул ошибку {resp.status}: {text[:300]}")
@@ -937,7 +862,7 @@ async def main():
     print(f"  API_HASH = {API_HASH}")
     print(f"  PHONE = {PHONE}")
     print(f"  AI_API = {AI_API_URL}")
-    print(f"  MODEL = gemini-2.0-flash")
+    print(f"  MODEL = {AI_MODEL}")
 
     # Тестируем API
     if not await test_ai_api():
