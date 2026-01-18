@@ -40,3 +40,4 @@ Thumbs.db
 # Temp files
 temp/
 tmp/
+__pycache__/
